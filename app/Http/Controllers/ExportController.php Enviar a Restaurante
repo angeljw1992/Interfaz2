@@ -1,0 +1,54 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Flores\PosFileGen;
+use Illuminate\Support\Facades\Response;
+
+class ExportController extends Controller
+{
+    public function exportToTxt()
+    {
+        $data = DB::table('alta_empleados')->select('nombre_empleado', 'id_empleado', 'role')->get();
+
+        $file = new PosFileGen(["id", "name", "level", "expire", "password", "signature"]);
+
+        $line = $file->newLine();
+
+        foreach ($data ?? [] as $row) {
+            $last_three_digits = substr($row->id_empleado, -3); // Obtener los últimos 3 dígitos del código de empleado
+
+            $line = $file->newLine();
+            $line->{"id"} = $row->id_empleado;
+            $line->{"name"} = $row->nombre_empleado;
+            $line->{"level"} = $row->role;
+            $line->{"expire"} = "99991231"; //strtotime("+1 year");
+            $line->{"password"} = $file->generatePassword($row->id_empleado, $last_three_digits);
+
+            $arr = json_decode(json_encode($line), true);
+            unset($arr["signature"]);
+            $implode = implode(",", $arr) . ",";
+            $line->{"signature"} = $file->hash($implode);
+
+            $file->add($line);
+        }
+
+        $name = "security.data";
+        $localPath = storage_path("app/public/" . $name);
+        $file->save($name, storage_path("app/public/"));
+
+        // Copiar el archivo a la ubicación remota
+        $destinationPath = '\\\\10.122.53.71\\D$\\security.data';
+        copy($localPath, $destinationPath);
+
+        // Descargar el archivo desde la ubicación local a través de la respuesta HTTP
+        $headers = [
+            'Content-Type' => 'text/plain',
+            'Content-Disposition' => 'attachment; filename="security.data"',
+        ];
+        return response()->download($localPath, "security.data", $headers);
+    }
+}

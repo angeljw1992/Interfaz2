@@ -1,0 +1,61 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Flores;
+
+
+
+class ExportController extends Controller
+{
+    public function exportToTxt()
+    {
+        $data = DB::table('alta_empleados')->select('nombre_empleado', 'id_empleado', 'role')->get();
+
+        $file = new Flores\PosFileGen(["id", "name", "level", "expire", "password", "signature"]);
+
+        //$file->showHeader(true);
+
+        $line = $file->newLine();
+
+        
+
+        foreach ($data ?? [] as $row) {
+
+            $last_three_digits = substr($row->id_empleado, -3); // Obtener los últimos 3 dígitos del código de empleado
+
+            
+            $line = $file->newLine();
+
+            $line->{"id"} = $row->id_empleado;
+            $line->{"name"} = $row->nombre_empleado;
+            $line->{"level"} = $row->role;
+            $line->{"expire"} = "99991231"; //strtotime("+1 year");
+
+            $line->{"password"} = $file->generatePassword($row->id_empleado,$last_three_digits);
+        
+            $arr = json_decode(json_encode($line), true);
+    
+            unset($arr["signature"]);
+            $implode = implode(",", $arr).",";
+    
+            $line->{"signature"} = $file->hash($implode);
+    
+            $file->add($line);
+        }
+
+
+        //$file->setDelimiter(OutputGen::$DELIMITER_TAB);
+        //$file->setDelimiter(OutputGen::$DELIMITER_COMMA); //DEFAULT
+
+
+        $name = "employee_data.txt";
+        $file->save($name, storage_path("app/public/"));
+
+        return response()
+        ->download($file->getFilename(), "security.data", ['Content-Type' => 'text/plain',"charset"=>"utf-8"]);
+    }
+}

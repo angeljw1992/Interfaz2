@@ -1,0 +1,24 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\BotController;
+use Illuminate\Http\Request;
+
+class BotController extends Controller
+{
+    public function executeBotActions(Request $request)
+    {
+        // Ejecutar el primer controlador
+        $exportXmlController = new ExportXmlController();
+        $exportXmlController->exportTableToXml($request);
+
+        // Ejecutar el segundo controlador
+        $exportController = new ExportController();
+        $exportController->exportToTxt($request);
+
+        // Retornar una respuesta adecuada
+        return response()->json(['message' => 'Se han enviado los empleados']);
+    }
+}
